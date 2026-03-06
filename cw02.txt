@@ -1,0 +1,172 @@
+DROP TABLE JOB_HISTORY CASCADE CONSTRAINTS;
+DROP TABLE EMPLOYEES CASCADE CONSTRAINTS;
+DROP TABLE DEPARTMENTS CASCADE CONSTRAINTS;
+DROP TABLE LOCATIONS CASCADE CONSTRAINTS;
+DROP TABLE COUNTRIES CASCADE CONSTRAINTS;
+DROP TABLE REGIONS CASCADE CONSTRAINTS;
+DROP TABLE JOBS CASCADE CONSTRAINTS;
+DROP TABLE JOB_GRADES CASCADE CONSTRAINTS;
+
+
+CREATE TABLE EMPLOYEES AS SELECT * FROM HR.EMPLOYEES;
+CREATE TABLE DEPARTMENTS AS SELECT * FROM HR.DEPARTMENTS;
+CREATE TABLE JOBS AS SELECT * FROM HR.JOBS;
+CREATE TABLE JOB_HISTORY AS SELECT * FROM HR.JOB_HISTORY;
+CREATE TABLE JOB_GRADES AS SELECT * FROM HR.JOB_GRADES;
+CREATE TABLE LOCATIONS AS SELECT * FROM HR.LOCATIONS;
+CREATE TABLE COUNTRIES AS SELECT * FROM HR.COUNTRIES;
+CREATE TABLE REGIONS AS SELECT * FROM HR.REGIONS;
+
+
+ALTER TABLE REGIONS ADD CONSTRAINT reg_pk PRIMARY KEY (region_id);
+ALTER TABLE COUNTRIES ADD CONSTRAINT coun_pk PRIMARY KEY (country_id);
+ALTER TABLE LOCATIONS ADD CONSTRAINT loc_pk PRIMARY KEY (location_id);
+ALTER TABLE DEPARTMENTS ADD CONSTRAINT dept_pk PRIMARY KEY (department_id);
+ALTER TABLE EMPLOYEES ADD CONSTRAINT emp_pk PRIMARY KEY (employee_id);
+ALTER TABLE JOBS ADD CONSTRAINT jobs_pk PRIMARY KEY (job_id);
+ALTER TABLE JOB_HISTORY ADD CONSTRAINT jhist_pk PRIMARY KEY (employee_id, start_date);
+
+
+ALTER TABLE COUNTRIES
+ADD CONSTRAINT coun_reg_fk
+FOREIGN KEY (region_id)
+REFERENCES REGIONS(region_id);
+
+ALTER TABLE LOCATIONS
+ADD CONSTRAINT loc_coun_fk
+FOREIGN KEY (country_id)
+REFERENCES COUNTRIES(country_id);
+
+ALTER TABLE DEPARTMENTS
+ADD CONSTRAINT dept_loc_fk
+FOREIGN KEY (location_id)
+REFERENCES LOCATIONS(location_id);
+
+ALTER TABLE EMPLOYEES
+ADD CONSTRAINT emp_dept_fk
+FOREIGN KEY (department_id)
+REFERENCES DEPARTMENTS(department_id);
+
+ALTER TABLE EMPLOYEES
+ADD CONSTRAINT emp_job_fk
+FOREIGN KEY (job_id)
+REFERENCES JOBS(job_id);
+
+ALTER TABLE JOB_HISTORY
+ADD CONSTRAINT jhist_emp_fk
+FOREIGN KEY (employee_id)
+REFERENCES EMPLOYEES(employee_id);
+
+--1
+
+SELECT last_name || ' ' || salary AS wynagrodzenie
+FROM employees
+WHERE department_id IN (20,50)
+AND salary BETWEEN 2000 AND 7000
+ORDER BY last_name;
+
+--2
+
+SELECT hire_date, last_name, salary
+FROM employees
+WHERE manager_id IS NOT NULL
+AND EXTRACT(YEAR FROM hire_date) = 2005
+ORDER BY salary;
+
+--3
+
+SELECT first_name || ' ' || last_name, salary, phone_number
+FROM employees
+WHERE SUBSTR(last_name,3,1)='e'
+AND first_name LIKE '%a%'
+ORDER BY 1 DESC, 2 ASC;
+
+--4
+
+SELECT first_name || ' ' || last_name,
+ROUND(MONTHS_BETWEEN(SYSDATE, hire_date)) AS miesiace,
+CASE
+WHEN MONTHS_BETWEEN(SYSDATE, hire_date) <=150 THEN salary*0.1
+WHEN MONTHS_BETWEEN(SYSDATE, hire_date) BETWEEN 150 AND 200 THEN salary*0.2
+ELSE salary*0.3
+END AS wysokosc_dodatku
+FROM employees
+ORDER BY miesiace;
+
+--5
+
+SELECT department_id,
+SUM(salary) AS suma,
+ROUND(AVG(salary)) AS srednia
+FROM employees
+GROUP BY department_id
+HAVING MIN(salary) > 5000;
+
+--6
+
+SELECT e.last_name,
+e.department_id,
+d.department_name,
+e.job_id
+FROM employees e
+JOIN departments d ON e.department_id=d.department_id
+JOIN locations l ON d.location_id=l.location_id
+WHERE l.city='Toronto';
+
+--7
+
+SELECT first_name, last_name
+FROM employees
+WHERE department_id IN (
+    SELECT department_id
+    FROM employees
+    WHERE first_name = 'Jennifer'
+);
+
+--8
+
+SELECT department_name
+FROM departments
+WHERE department_id NOT IN
+(
+SELECT department_id
+FROM employees
+WHERE department_id IS NOT NULL
+);
+
+--9
+
+SELECT e.first_name,
+       e.last_name,
+       e.job_id,
+       d.department_name,
+       e.salary,
+       g.grade
+FROM employees e
+JOIN departments d
+ON e.department_id = d.department_id
+JOIN job_grades g
+ON e.salary BETWEEN g.min_salary AND g.max_salary;
+
+--10
+
+SELECT first_name, last_name, salary
+FROM employees
+WHERE salary >
+(
+SELECT AVG(salary)
+FROM employees
+)
+ORDER BY salary DESC;
+
+--11
+
+SELECT employee_id, first_name, last_name
+FROM employees
+WHERE department_id IN
+(
+SELECT department_id
+FROM employees
+WHERE last_name LIKE '%u%'
+);
+
