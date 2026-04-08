@@ -1,0 +1,101 @@
+CREATE OR REPLACE VIEW v_wysokie_pensje AS
+SELECT *
+FROM employees
+WHERE salary > 6000;
+
+
+CREATE OR REPLACE VIEW v_wysokie_pensje AS
+SELECT *
+FROM employees
+WHERE salary > 12000;
+
+DROP VIEW v_wysokie_pensje;
+
+
+CREATE OR REPLACE VIEW v_finance AS
+SELECT e.employee_id,
+       e.last_name,
+       e.first_name
+FROM employees e
+JOIN departments d ON e.department_id = d.department_id
+WHERE d.department_name = 'Finance';
+
+CREATE OR REPLACE VIEW v_srednie_pensje AS
+SELECT employee_id,
+       last_name,
+       first_name,
+       salary,
+       job_id,
+       email,
+       hire_date
+FROM employees
+WHERE salary BETWEEN 5000 AND 12000;
+
+INSERT INTO v_srednie_pensje
+(employee_id, last_name, first_name, salary, job_id, email, hire_date)
+VALUES (999, 'Test', 'Jan', 6000, 'IT_PROG', 'test@mail.com', SYSDATE);
+
+UPDATE v_srednie_pensje
+SET salary = 7000
+WHERE employee_id = 999;
+
+DELETE FROM v_srednie_pensje
+WHERE employee_id = 999;
+
+CREATE OR REPLACE VIEW v_statystyki_dzialow AS
+SELECT d.department_id,
+       d.department_name,
+       COUNT(e.employee_id) AS liczba_pracownikow,
+       ROUND(AVG(e.salary)) AS srednia_pensja,
+       MAX(e.salary) AS max_pensja
+FROM departments d
+JOIN employees e ON d.department_id = e.department_id
+GROUP BY d.department_id, d.department_name
+HAVING COUNT(e.employee_id) >= 4;
+
+
+INSERT INTO v_statystyki_dzialow
+VALUES (999, 'TEST', 4, 6000, 10000);
+
+
+CREATE OR REPLACE VIEW v_srednie_pensje_check AS
+SELECT employee_id,
+       last_name,
+       first_name,
+       salary,
+       job_id,
+       email,
+       hire_date
+FROM employees
+WHERE salary BETWEEN 5000 AND 12000
+WITH CHECK OPTION;
+
+INSERT INTO v_srednie_pensje_check
+(employee_id, last_name, first_name, salary, job_id, email, hire_date)
+VALUES (1000, 'Nowy', 'Adam', 7000, 'IT_PROG', 'adam@mail.com', SYSDATE);
+
+INSERT INTO v_srednie_pensje_check
+(employee_id, last_name, first_name, salary, job_id, email, hire_date)
+VALUES (1001, 'Nowy', 'Adam', 15000, 'IT_PROG', 'adam2@mail.com', SYSDATE);
+
+
+CREATE MATERIALIZED VIEW v_managerowie
+BUILD IMMEDIATE
+REFRESH COMPLETE ON DEMAND
+AS
+SELECT e.employee_id,
+       e.last_name,
+       e.job_id,
+       d.department_name
+FROM employees e
+JOIN departments d ON e.department_id = d.department_id
+WHERE e.job_id LIKE '%MAN%';
+
+CREATE OR REPLACE VIEW v_najlepiej_oplacani AS
+SELECT *
+FROM (
+    SELECT e.*,
+           RANK() OVER (ORDER BY salary DESC) rnk
+    FROM employees e
+)
+WHERE rnk <= 10;
