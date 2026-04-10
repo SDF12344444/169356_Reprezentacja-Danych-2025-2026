@@ -1,0 +1,140 @@
+DECLARE
+    numer_max departments.department_id%TYPE;
+    nazwa departments.department_name%TYPE := 'EDUCATION';
+BEGIN
+    SELECT MAX(department_id) INTO numer_max FROM departments;
+
+    INSERT INTO departments (department_id, department_name)
+    VALUES (numer_max + 10, nazwa);
+
+    UPDATE departments
+    SET location_id = 3000
+    WHERE department_id = numer_max + 10;
+
+    DBMS_OUTPUT.PUT_LINE('Dodano departament: ' || (numer_max + 10));
+END;
+/
+
+CREATE TABLE nowa (tekst VARCHAR2(10));
+
+BEGIN
+    FOR i IN 1..10 LOOP
+        IF i NOT IN (4,6) THEN
+            INSERT INTO nowa VALUES (i);
+        END IF;
+    END LOOP;
+END;
+/
+
+DECLARE
+    kraj countries%ROWTYPE;
+BEGIN
+    SELECT * INTO kraj
+    FROM countries
+    WHERE country_id = 'CA';
+
+    DBMS_OUTPUT.PUT_LINE(kraj.country_name || ' ' || kraj.region_id);
+END;
+/
+
+DECLARE
+    CURSOR c IS
+        SELECT last_name, salary
+        FROM employees
+        WHERE department_id = 50;
+BEGIN
+    FOR r IN c LOOP
+        IF r.salary > 3100 THEN
+            DBMS_OUTPUT.PUT_LINE(r.last_name || ' nie dawac podwyzki');
+        ELSE
+            DBMS_OUTPUT.PUT_LINE(r.last_name || ' dac podwyzke');
+        END IF;
+    END LOOP;
+END;
+/
+
+DECLARE
+    CURSOR c(min_sal NUMBER, max_sal NUMBER, imie VARCHAR2) IS
+        SELECT first_name, last_name, salary
+        FROM employees
+        WHERE salary BETWEEN min_sal AND max_sal
+        AND LOWER(first_name) LIKE '%' || LOWER(imie) || '%';
+BEGIN
+    FOR r IN c(1000,5000,'a') LOOP
+        DBMS_OUTPUT.PUT_LINE(r.first_name || ' ' || r.last_name || ' ' || r.salary);
+    END LOOP;
+
+    FOR r IN c(5000,20000,'u') LOOP
+        DBMS_OUTPUT.PUT_LINE(r.first_name || ' ' || r.last_name || ' ' || r.salary);
+    END LOOP;
+END;
+/
+
+CREATE OR REPLACE PROCEDURE dodaj_job(p_id VARCHAR2, p_title VARCHAR2) IS
+BEGIN
+    INSERT INTO jobs(job_id, job_title)
+    VALUES (p_id, p_title);
+EXCEPTION
+    WHEN OTHERS THEN
+        DBMS_OUTPUT.PUT_LINE('Blad: ' || SQLERRM);
+END;
+/
+
+CREATE OR REPLACE PROCEDURE zmien_job(p_id VARCHAR2, p_title VARCHAR2) IS
+BEGIN
+    UPDATE jobs
+    SET job_title = p_title
+    WHERE job_id = p_id;
+
+    IF SQL%ROWCOUNT = 0 THEN
+        RAISE_APPLICATION_ERROR(-20001, 'Brak rekordu do zmiany');
+    END IF;
+END;
+/
+
+CREATE OR REPLACE PROCEDURE usun_job(p_id VARCHAR2) IS
+BEGIN
+    DELETE FROM jobs
+    WHERE job_id = p_id;
+
+    IF SQL%ROWCOUNT = 0 THEN
+        RAISE_APPLICATION_ERROR(-20002, 'Brak rekordu do usuniecia');
+    END IF;
+END;
+/
+
+CREATE OR REPLACE PROCEDURE dane_pracownika(
+    p_id IN employees.employee_id%TYPE,
+    p_last OUT employees.last_name%TYPE,
+    p_salary OUT employees.salary%TYPE
+) IS
+BEGIN
+    SELECT last_name, salary
+    INTO p_last, p_salary
+    FROM employees
+    WHERE employee_id = p_id;
+END;
+/
+
+CREATE SEQUENCE emp_seq START WITH 1000;
+
+CREATE OR REPLACE PROCEDURE dodaj_pracownika(
+    p_first_name VARCHAR2 DEFAULT 'Jan',
+    p_last_name VARCHAR2 DEFAULT 'Kowalski',
+    p_email VARCHAR2 DEFAULT 'test@mail.com',
+    p_job_id VARCHAR2 DEFAULT 'IT_PROG',
+    p_salary NUMBER DEFAULT 5000
+) IS
+BEGIN
+    IF p_salary > 20000 THEN
+        RAISE_APPLICATION_ERROR(-20003, 'Za wysokie wynagrodzenie');
+    END IF;
+
+    INSERT INTO employees(
+        employee_id, first_name, last_name, email, hire_date, job_id, salary
+    )
+    VALUES(
+        emp_seq.NEXTVAL, p_first_name, p_last_name, p_email, SYSDATE, p_job_id, p_salary
+    );
+END;
+/
