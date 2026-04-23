@@ -50,6 +50,7 @@ def plot_feature_importance(model, feature_names, title, model_name):
     sns.barplot(x=feat_imp.values[:top_n], y=feat_imp.index[:top_n], palette='viridis')
     plt.title(f'{title} - Top {top_n} cech', fontsize=14)
     plt.xlabel('Istotność', fontsize=12)
+    plt.ylabel('Cechy', fontsize=12)
     plt.tight_layout()
     plt.savefig(f'{model_name}_feature_importance.png', dpi=150)
     plt.close()
