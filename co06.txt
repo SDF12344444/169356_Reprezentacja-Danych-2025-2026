@@ -1,0 +1,218 @@
+CREATE OR REPLACE FUNCTION f_job_name(p_id VARCHAR2)
+RETURN VARCHAR2 IS
+    v_name jobs.job_title%TYPE;
+BEGIN
+    SELECT job_title INTO v_name FROM jobs WHERE job_id = p_id;
+    RETURN v_name;
+EXCEPTION
+    WHEN NO_DATA_FOUND THEN
+        RETURN 'BRAK';
+END;
+/
+
+CREATE OR REPLACE FUNCTION f_roczne_zarobki(p_id NUMBER)
+RETURN NUMBER IS
+    v_salary employees.salary%TYPE;
+    v_comm employees.commission_pct%TYPE;
+BEGIN
+    SELECT salary, NVL(commission_pct,0)
+    INTO v_salary, v_comm
+    FROM employees
+    WHERE employee_id = p_id;
+
+    RETURN v_salary*12 + v_salary*v_comm;
+END;
+/
+
+CREATE OR REPLACE FUNCTION f_kierunkowy(p_tel VARCHAR2)
+RETURN VARCHAR2 IS
+BEGIN
+    RETURN SUBSTR(p_tel,1,INSTR(p_tel,'.')-1);
+END;
+/
+
+CREATE OR REPLACE FUNCTION f_format_napis(p_txt VARCHAR2)
+RETURN VARCHAR2 IS
+BEGIN
+    RETURN UPPER(SUBSTR(p_txt,1,1)) ||
+           LOWER(SUBSTR(p_txt,2,LENGTH(p_txt)-2)) ||
+           UPPER(SUBSTR(p_txt,-1));
+END;
+/
+
+CREATE OR REPLACE FUNCTION f_pesel(pesel VARCHAR2)
+RETURN DATE IS
+    rok NUMBER;
+    mies NUMBER;
+    dzien NUMBER;
+BEGIN
+    rok := TO_NUMBER(SUBSTR(pesel,1,2));
+    mies := TO_NUMBER(SUBSTR(pesel,3,2));
+    dzien := TO_NUMBER(SUBSTR(pesel,5,2));
+
+    IF mies > 20 THEN
+        mies := mies - 20;
+        rok := 2000 + rok;
+    ELSE
+        rok := 1900 + rok;
+    END IF;
+
+    RETURN TO_DATE(rok||'-'||mies||'-'||dzien,'YYYY-MM-DD');
+END;
+/
+
+CREATE OR REPLACE FUNCTION f_stat_kraj(p_kraj VARCHAR2)
+RETURN VARCHAR2 IS
+    v_emp NUMBER;
+    v_dep NUMBER;
+BEGIN
+    SELECT COUNT(e.employee_id), COUNT(DISTINCT d.department_id)
+    INTO v_emp, v_dep
+    FROM employees e
+    JOIN departments d ON e.department_id=d.department_id
+    JOIN locations l ON d.location_id=l.location_id
+    JOIN countries c ON l.country_id=c.country_id
+    WHERE LOWER(c.country_name)=LOWER(p_kraj);
+
+    IF v_emp = 0 THEN
+        RAISE NO_DATA_FOUND;
+    END IF;
+
+    RETURN 'EMP:'||v_emp||' DEP:'||v_dep;
+EXCEPTION
+    WHEN NO_DATA_FOUND THEN
+        RETURN 'BRAK KRAJU';
+END;
+/
+
+CREATE TABLE archiwum_departamentow(
+    id NUMBER,
+    nazwa VARCHAR2(50),
+    data_zamkniecia DATE,
+    ostatni_manager VARCHAR2(100)
+);
+
+CREATE OR REPLACE TRIGGER trg_del_dept
+AFTER DELETE ON departments
+FOR EACH ROW
+DECLARE
+    v_man VARCHAR2(100);
+BEGIN
+    SELECT first_name||' '||last_name
+    INTO v_man
+    FROM employees
+    WHERE employee_id = :OLD.manager_id;
+
+    INSERT INTO archiwum_departamentow
+    VALUES(:OLD.department_id,:OLD.department_name,SYSDATE,v_man);
+END;
+/
+
+
+CREATE TABLE zlodziej(
+    id NUMBER,
+    user_name VARCHAR2(50),
+    czas DATE
+);
+CREATE OR REPLACE TRIGGER trg_salary_check
+BEFORE INSERT OR UPDATE ON employees
+FOR EACH ROW
+BEGIN
+    IF :NEW.salary < 2000 OR :NEW.salary > 26000 THEN
+        INSERT INTO zlodziej VALUES(1,USER,SYSDATE);
+        RAISE_APPLICATION_ERROR(-20010,'Zla pensja');
+    END IF;
+END;
+/
+
+CREATE SEQUENCE emp_seq2 START WITH 10000;
+
+CREATE OR REPLACE TRIGGER trg_emp_id
+BEFORE INSERT ON employees
+FOR EACH ROW
+BEGIN
+    :NEW.employee_id := emp_seq2.NEXTVAL;
+END;
+/
+
+CREATE OR REPLACE TRIGGER trg_block_job_grades
+BEFORE INSERT OR UPDATE OR DELETE ON job_grades
+BEGIN
+    RAISE_APPLICATION_ERROR(-20011,'Zabronione');
+END;
+/
+
+CREATE OR REPLACE TRIGGER trg_jobs_block
+BEFORE UPDATE OF min_salary, max_salary ON jobs
+FOR EACH ROW
+BEGIN
+    :NEW.min_salary := :OLD.min_salary;
+    :NEW.max_salary := :OLD.max_salary;
+END;
+/
+
+
+CREATE OR REPLACE PACKAGE pakiet_all AS
+    FUNCTION f_job_name(p_id VARCHAR2) RETURN VARCHAR2;
+    FUNCTION f_roczne_zarobki(p_id NUMBER) RETURN NUMBER;
+END;
+/
+
+CREATE OR REPLACE PACKAGE BODY pakiet_all AS
+    FUNCTION f_job_name(p_id VARCHAR2) RETURN VARCHAR2 IS
+        v_name jobs.job_title%TYPE;
+    BEGIN
+        SELECT job_title INTO v_name FROM jobs WHERE job_id = p_id;
+        RETURN v_name;
+    END;
+
+    FUNCTION f_roczne_zarobki(p_id NUMBER) RETURN NUMBER IS
+        v_salary employees.salary%TYPE;
+        v_comm employees.commission_pct%TYPE;
+    BEGIN
+        SELECT salary, NVL(commission_pct,0)
+        INTO v_salary, v_comm
+        FROM employees
+        WHERE employee_id = p_id;
+
+        RETURN v_salary*12 + v_salary*v_comm;
+    END;
+END;
+/
+
+
+CREATE OR REPLACE PACKAGE pakiet_regions AS
+    PROCEDURE add_region(p_id NUMBER, p_name VARCHAR2);
+    PROCEDURE update_region(p_id NUMBER, p_name VARCHAR2);
+    PROCEDURE delete_region(p_id NUMBER);
+    FUNCTION get_region(p_id NUMBER) RETURN VARCHAR2;
+END;
+/
+
+CREATE OR REPLACE PACKAGE BODY pakiet_regions AS
+    PROCEDURE add_region(p_id NUMBER, p_name VARCHAR2) IS
+    BEGIN
+        INSERT INTO regions VALUES(p_id,p_name);
+    END;
+
+    PROCEDURE update_region(p_id NUMBER, p_name VARCHAR2) IS
+    BEGIN
+        UPDATE regions SET region_name=p_name WHERE region_id=p_id;
+    END;
+
+    PROCEDURE delete_region(p_id NUMBER) IS
+    BEGIN
+        DELETE FROM regions WHERE region_id=p_id;
+    END;
+
+    FUNCTION get_region(p_id NUMBER) RETURN VARCHAR2 IS
+        v_name VARCHAR2(50);
+    BEGIN
+        SELECT region_name INTO v_name FROM regions WHERE region_id=p_id;
+        RETURN v_name;
+    END;
+END;
+/
+
+
+
